@@ -1,0 +1,81 @@
+import streamlit as st
+import pandas as pd
+
+# 🔹 CED katsayıları (örnek değerler)
+CED_FACTORS = {
+    "Cyclophosphamide": 1.0,
+    "Ifosfamide": 0.244,
+    "Melphalan": 40,
+    "Chlorambucil": 14,
+    "Carmustine (BCNU)": 15,
+    "Lomustine (CCNU)": 16,
+    "Busulfan": 8.6,
+    "Procarbazine": 0.857,
+    "Dacarbazine": 0.083,
+}
+
+# 🔹 Örnek protokoller
+PROTOCOLS = {
+    "COPP": ["Cyclophosphamide", "Oncovin (Vincristine)", "Procarbazine", "Prednizon"],
+    "BEACOPP": ["Bleomycin", "Etoposide", "Adriamycin", "Cyclophosphamide", "Oncovin (Vincristine)", "Procarbazine", "Prednizon"],
+    "ABVD": ["Adriamycin", "Bleomycin", "Vinblastine", "Dacarbazine"],
+}
+
+# 🔹 Hesaplama fonksiyonu
+def calculate_ced(drug, dose, cycles):
+    factor = CED_FACTORS.get(drug, 0)
+    return dose * cycles * factor
+
+# --- Streamlit Arayüzü ---
+st.title("💊 CED (Cyclophosphamide Equivalent Dose) Hesaplayıcı")
+
+st.sidebar.header("İlaç / Protokol Seçimi")
+
+# --- Kullanıcı seçimi ---
+selected_drugs = st.sidebar.multiselect(
+    "Bireysel ilaçlar:",
+    options=list(CED_FACTORS.keys()),
+)
+
+selected_protocols = st.sidebar.multiselect(
+    "Protokoller:",
+    options=list(PROTOCOLS.keys())
+)
+
+# --- Protokollerden gelen ilaçları ekle ---
+for protocol in selected_protocols:
+    for drug in PROTOCOLS[protocol]:
+        if drug in CED_FACTORS and drug not in selected_drugs:
+            selected_drugs.append(drug)
+
+# --- İlaç giriş tablosu ---
+if selected_drugs:
+    st.subheader("İlaç Dozları ve Kür Sayıları")
+
+    data = []
+    for drug in selected_drugs:
+        col1, col2, col3 = st.columns([3, 2, 2])
+        with col1:
+            st.write(drug)
+        with col2:
+            dose = st.number_input(f"{drug} Dozu (mg/m²)", min_value=0.0, step=10.0, key=f"dose_{drug}")
+        with col3:
+            cycles = st.number_input(f"{drug} Kür sayısı", min_value=0, step=1, key=f"cycles_{drug}")
+        data.append({
+            "İlaç": drug,
+            "Doz (mg/m²)": dose,
+            "Kür": cycles,
+            "CED": calculate_ced(drug, dose, cycles)
+        })
+
+    df = pd.DataFrame(data)
+    total_ced = df["CED"].sum()
+
+    st.dataframe(df.style.format({"Doz (mg/m²)": "{:.1f}", "CED": "{:.2f}"}))
+    st.markdown("---")
+    st.metric("Toplam CED", f"{total_ced:.2f} mg/m²")
+
+else:
+    st.info("Lütfen sol menüden ilaç veya protokol seçiniz.")
+
+
